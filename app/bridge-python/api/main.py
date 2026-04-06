@@ -146,12 +146,16 @@ async def lifespan(app: FastAPI):
 # Create main FastAPI app
 app = FastAPI(title="Chrome MCP WebSocket Bridge", lifespan=lifespan)
 
+# Custom CORS config that allows requests with no origin (e.g., curl, server-to-server)
+# This matches the Node.js implementation
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_origin_regex=r".*",  # Allow any origin including none
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 

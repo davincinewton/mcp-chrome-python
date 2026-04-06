@@ -1,4 +1,5 @@
-import { initNativeHostListener } from './native-host';
+// import { initNativeHostListener } from './native-host';
+import { initWebSocketHostListener } from './websocket-host';
 import {
   initSemanticSimilarityListener,
   initializeSemanticEngineIfCached,
@@ -37,7 +38,7 @@ export default defineBackground(() => {
   });
 
   // Initialize core services
-  initNativeHostListener();
+  initWebSocketHostListener();
   initSemanticSimilarityListener();
   initStorageManagerListener();
   // Record & Replay V1/V2 listeners

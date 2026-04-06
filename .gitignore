@@ -46,4 +46,5 @@ CLAUDE.md
 **/*/coverage/*
 
 .docs/
-.claude/
+.claude/*.pyc
+__pycache__/

@@ -336,12 +336,19 @@ async function ensureNativeConnected(trigger: string, portOverride?: unknown): P
  * @returns Whether the connection was initiated successfully
  */
 export function connectNativeHost(port: number = NATIVE_HOST.DEFAULT_PORT): boolean {
+  console.log(`[DEBUG connectNativeHost] HOST_NAME = ${HOST_NAME}`);
+  console.log(`[DEBUG connectNativeHost] port = ${port}`);
+  console.log(`[DEBUG connectNativeHost] nativePort = ${nativePort}`);
+
   if (nativePort) {
+    console.log(`[DEBUG connectNativeHost] Already connected, returning true`);
     return true;
   }
 
   try {
+    console.log(`[DEBUG connectNativeHost] Calling chrome.runtime.connectNative('${HOST_NAME}')`);
     nativePort = chrome.runtime.connectNative(HOST_NAME);
+    console.log(`[DEBUG connectNativeHost] connectNative returned:`, nativePort);
 
     nativePort.onMessage.addListener(async (message) => {
       if (message.type === NativeMessageType.PROCESS_DATA && message.requestId) {
@@ -438,7 +445,13 @@ export function connectNativeHost(port: number = NATIVE_HOST.DEFAULT_PORT): bool
     });
 
     nativePort.onDisconnect.addListener(() => {
-      console.warn(ERROR_MESSAGES.NATIVE_DISCONNECTED, chrome.runtime.lastError);
+      const err = chrome.runtime.lastError;
+      console.error(`[DEBUG onDisconnect] DISCONNECTED! chrome.runtime.lastError:`, err);
+      if (err) {
+        console.error(`[DEBUG onDisconnect] Error message:`, err.message);
+        console.error(`[DEBUG onDisconnect] Error details:`, JSON.stringify(err));
+      }
+      console.warn(ERROR_MESSAGES.NATIVE_DISCONNECTED, err);
       nativePort = null;
 
       // Mark server as stopped since native host disconnection means server is down
@@ -453,11 +466,17 @@ export function connectNativeHost(port: number = NATIVE_HOST.DEFAULT_PORT): bool
       scheduleReconnect('native_port_disconnected');
     });
 
+    console.log(
+      `[DEBUG connectNativeHost] Sending START message: ${JSON.stringify({ type: NativeMessageType.START, payload: { port } })}`,
+    );
     nativePort.postMessage({ type: NativeMessageType.START, payload: { port } });
     // Note: Don't reset reconnect state here. Wait for SERVER_STARTED confirmation.
     // Chrome may return a Port but disconnect immediately if native host is missing.
     return true;
-  } catch (error) {
+  } catch (error: any) {
+    console.error(`[DEBUG connectNativeHost] EXCEPTION CAUGHT:`, error);
+    console.error(`[DEBUG connectNativeHost] Error message:`, error?.message);
+    console.error(`[DEBUG connectNativeHost] chrome.runtime.lastError:`, chrome.runtime.lastError);
     console.warn(ERROR_MESSAGES.NATIVE_CONNECTION_FAILED, error);
     nativePort = null;
     return false;

@@ -9,6 +9,17 @@ export const NATIVE_HOST = {
   DEFAULT_PORT: 12306,
 } as const;
 
+// WebSocket Configuration
+export const WEBSOCKET_CONFIG = {
+  HOST: '127.0.0.1',
+  PORT: 12307,
+  URL: 'ws://127.0.0.1:12307',
+  RECONNECT_BASE_DELAY_MS: 500,
+  RECONNECT_MAX_DELAY_MS: 60_000,
+  RECONNECT_MAX_FAST_ATTEMPTS: 8,
+  RECONNECT_COOLDOWN_DELAY_MS: 5 * 60_000,
+} as const;
+
 // Chrome Extension Icons
 export const ICONS = {
   NOTIFICATION: 'icon/48.png',
