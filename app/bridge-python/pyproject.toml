@@ -1,0 +1,100 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-chrome-bridge"
+version = "0.1.0"
+description = "Chrome MCP Native Server - Bridges Chrome extension with MCP-compatible AI assistants"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Ross", email = "rosspanda0@gmail.com" }
+]
+keywords = [
+    "chrome",
+    "mcp",
+    "native-messaging",
+    "browser-automation",
+    "ai-assistant",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+]
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "websockets>=12.0",
+    "mcp>=1.0.0",
+    "pydantic>=2.0.0",
+    "starlette>=0.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+mcp-chrome-bridge = "bridge_python.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/davincinewton/mcp-chrome-python"
+Documentation = "https://github.com/davincinewton/mcp-chrome-python/tree/master/app/bridge-python"
+Repository = "https://github.com/davincinewton/mcp-chrome-python.git"
+Issues = "https://github.com/davincinewton/mcp-chrome-python/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bridge_python"]
+# Force include source files alongside the package
+[tool.hatch.build.targets.wheel.force-include]
+"main.py" = "bridge_python/main.py"
+"utils.py" = "bridge_python/utils.py"
+"mcp_server_logic.py" = "bridge_python/mcp_server_logic.py"
+"api/" = "bridge_python/api/"
+"bridge/" = "bridge_python/bridge/"
+"schemas/" = "bridge_python/schemas/"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/bridge_python",
+    "/main.py",
+    "/utils.py",
+    "/mcp_server_logic.py",
+    "/api",
+    "/bridge",
+    "/schemas",
+    "/README.md",
+    "/pyproject.toml",
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
