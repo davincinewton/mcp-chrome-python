@@ -7,9 +7,6 @@ from typing import Any, Dict, Optional, Callable, Awaitable, Tuple
 import websockets
 from .base import ExtensionBridge
 
-# Import state for activity tracking
-from api.main import state
-
 logger = logging.getLogger("ws-bridge")
 
 # Constants for memory leak prevention
@@ -48,6 +45,8 @@ class WebSocketBridge(ExtensionBridge):
 
     async def _handle_connection(self, websocket: websockets.WebSocketServerProtocol):
         """Handles the lifecycle of a single WebSocket connection."""
+        from api.main import state
+
         logger.info(f"Extension connected from {websocket.remote_address}")
         self._connection = websocket
         state.ws_connected = True
@@ -71,6 +70,8 @@ class WebSocketBridge(ExtensionBridge):
 
     async def _process_incoming_message(self, raw_message: str):
         """Parses and dispatches incoming JSON messages."""
+        from api.main import state
+
         try:
             message = json.loads(raw_message)
             state.last_activity = time.time()
@@ -108,6 +109,8 @@ class WebSocketBridge(ExtensionBridge):
 
     async def send_message(self, message: Dict[str, Any]) -> None:
         """Sends a JSON message to the connected extension."""
+        from api.main import state
+
         if not self._connection:
             logger.warning("Cannot send message: No extension connected")
             return
@@ -150,6 +153,8 @@ class WebSocketBridge(ExtensionBridge):
 
     async def cleanup(self) -> None:
         """Gracefully shuts down the WebSocket server."""
+        from api.main import state
+
         self._running = False
         state.ws_connected = False
 
