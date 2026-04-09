@@ -28,6 +28,7 @@ class WebSocketBridge(ExtensionBridge):
         self._message_handler: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None
         self._server: Optional[websockets.server.WebSocketServer] = None
         self._running = False
+        self._connection_lock = asyncio.Lock()
 
     def set_message_handler(self, handler: Callable[[Dict[str, Any]], Awaitable[None]]) -> None:
         self._message_handler = handler
@@ -47,20 +48,21 @@ class WebSocketBridge(ExtensionBridge):
         """Handles the lifecycle of a single WebSocket connection."""
         from api.main import state
 
-        logger.info(f"Extension connected from {websocket.remote_address}")
+        async with self._connection_lock:
+            logger.info(f"Extension connected from {websocket.remote_address}")
 
-        # Close any existing connection before accepting a new one
-        if self._connection is not None:
-            logger.info("Closing previous connection before accepting new one")
-            state.ws_connected = False
-            try:
-                await self._connection.close()
-            except Exception:
-                pass
+            # Close any existing connection before accepting a new one
+            if self._connection is not None:
+                logger.info("Closing previous connection before accepting new one")
+                state.ws_connected = False
+                try:
+                    await self._connection.close()
+                except Exception:
+                    pass
 
-        self._connection = websocket
-        state.ws_connected = True
-        state.last_activity = time.time()
+            self._connection = websocket
+            state.ws_connected = True
+            state.last_activity = time.time()
 
         try:
             async for message in websocket:
@@ -70,8 +72,9 @@ class WebSocketBridge(ExtensionBridge):
         except Exception as e:
             logger.error(f"Error in connection loop: {e}")
         finally:
-            self._connection = None
-            state.ws_connected = False
+            async with self._connection_lock:
+                self._connection = None
+                state.ws_connected = False
             # Fail any pending requests on disconnect
             for future in self._pending_requests.values():
                 if not future.done():
