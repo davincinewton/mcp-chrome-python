@@ -2,6 +2,7 @@ import asyncio
 import argparse
 import logging
 import os
+import signal
 import sys
 from pathlib import Path
 import uvicorn
@@ -47,18 +48,13 @@ logger.addHandler(DualHandler())
 logger.setLevel(logging.DEBUG)
 logger.info(f"Chrome MCP Bridge starting, log file: {LOG_FILE}")
 
-# Server state
-http_server: uvicorn.Server | None = None
-http_server_running = False
+# Server state - track tasks for graceful shutdown
+http_task: asyncio.Task | None = None
+ws_task: asyncio.Task | None = None
+shutdown_event = asyncio.Event()
 
 async def start_http_server(port: int = 12306):
     """Start the FastAPI HTTP server."""
-    global http_server, http_server_running
-
-    if http_server_running:
-        logger.info(f"HTTP server already running on port {port}")
-        return
-
     config = uvicorn.Config(
         app=app,
         host="127.0.0.1",
@@ -66,22 +62,55 @@ async def start_http_server(port: int = 12306):
         log_level="info",
         lifespan="off"
     )
-    http_server = uvicorn.Server(config)
+    server = uvicorn.Server(config)
     logger.info(f"Starting MCP HTTP/SSE Server on port {port}...")
-    await http_server.serve()
-    http_server_running = True
-    logger.info(f"HTTP server is now running on port {port}")
+    await server.serve()
+    logger.info(f"HTTP server stopped on port {port}")
 
-async def stop_http_server():
-    """Stop the FastAPI HTTP server."""
-    global http_server, http_server_running
 
-    if http_server and http_server_running:
+async def cleanup(timeout: float = 3.0) -> None:
+    """
+    Gracefully shutdown all running tasks.
+
+    Args:
+        timeout: Maximum time to wait for graceful shutdown before force kill.
+    """
+    logger.info("Starting graceful shutdown...")
+
+    # Cancel WebSocket bridge task first (stop accepting new connections)
+    if ws_task and not ws_task.done():
+        logger.info("Stopping WebSocket bridge...")
+        ws_task.cancel()
+        try:
+            await asyncio.wait_for(ws_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("WebSocket bridge cancelled")
+        except asyncio.TimeoutError:
+            logger.warning("WebSocket bridge shutdown timed out, forcing")
+            ws_task.cancel()
+
+    # Cancel HTTP server task
+    if http_task and not http_task.done():
         logger.info("Stopping HTTP server...")
-        http_server.should_exit = True
-        await asyncio.sleep(0.5)  # Give it time to shut down
-        http_server_running = False
-        logger.info("HTTP server stopped")
+        http_task.cancel()
+        try:
+            await asyncio.wait_for(http_task, timeout=timeout)
+        except asyncio.CancelledError:
+            logger.info("HTTP server cancelled")
+        except asyncio.TimeoutError:
+            logger.warning("HTTP server shutdown timed out, forcing")
+            http_task.cancel()
+
+    # Cleanup bridge resources
+    try:
+        await state.bridge.cleanup()
+        logger.info("Bridge resources cleaned up")
+    except Exception as e:
+        logger.error(f"Error during bridge cleanup: {e}")
+
+    shutdown_event.set()
+    logger.info("Graceful shutdown complete")
+
 
 async def handle_bridge_message(message: dict):
     """Handle messages from the Chrome extension via Native Messaging."""
@@ -125,6 +154,8 @@ async def main():
     The main entry point for the Python Bridge.
     Starts BOTH the WebSocket Bridge and HTTP server.
     """
+    global http_task, ws_task
+
     logger.info("=" * 50)
     logger.info("Chrome MCP WebSocket Bridge Starting...")
     logger.info("=" * 50)
@@ -147,9 +178,13 @@ async def main():
     logger.info("=" * 50)
 
     try:
-        await state.bridge.start()
+        ws_task = asyncio.create_task(state.bridge.start())
+        await ws_task
     except Exception as e:
         logger.error(f"WebSocket Bridge encountered a fatal error: {e}")
+    finally:
+        # Trigger cleanup on any exit
+        await cleanup()
 
 
 def main_cli():
@@ -164,9 +199,35 @@ def main_cli():
     else:
         asyncio.run(main())
 
+
+async def run_with_signal_handling():
+    """Run the main function with proper signal handling for graceful shutdown."""
+    loop = asyncio.get_running_loop()
+
+    # Set up signal handlers for Unix-like systems
+    if sys.platform != "win32":
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, lambda: asyncio.create_task(handle_signal()))
+    else:
+        # Windows fallback: handle Ctrl+C via exception
+        pass
+
+    await main()
+
+
+async def handle_signal():
+    """Handle shutdown signals gracefully."""
+    logger.info("\nReceived shutdown signal, cleaning up...")
+    await cleanup(timeout=5.0)
+
+
 if __name__ == "__main__":
     try:
-        main_cli()
+        asyncio.run(run_with_signal_handling())
     except KeyboardInterrupt:
-        logger.info("\nShutting down...")
-        pass
+        # Fallback for when signal handling doesn't work
+        logger.info("\nShutting down via KeyboardInterrupt...")
+        try:
+            asyncio.run(cleanup(timeout=5.0))
+        except Exception:
+            pass
