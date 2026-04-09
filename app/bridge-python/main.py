@@ -189,10 +189,7 @@ async def handle_signal():
 if __name__ == "__main__":
     try:
         asyncio.run(run_with_signal_handling())
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         # Fallback for when signal handling doesn't work
-        logger.info("\nShutting down via KeyboardInterrupt...")
-        try:
-            asyncio.run(cleanup(timeout=5.0))
-        except Exception:
-            pass
+        # CancelledError is expected during graceful shutdown
+        pass

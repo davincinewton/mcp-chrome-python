@@ -48,17 +48,20 @@ class WebSocketBridge(ExtensionBridge):
         """Handles the lifecycle of a single WebSocket connection."""
         from api.main import state
 
+        connected = True
+
         async with self._connection_lock:
             logger.info(f"Extension connected from {websocket.remote_address}")
 
             # Close any existing connection before accepting a new one
             if self._connection is not None:
+                old_conn = self._connection
                 logger.info("Closing previous connection before accepting new one")
                 state.ws_connected = False
                 try:
-                    await self._connection.close()
-                except Exception:
-                    pass
+                    await old_conn.close()
+                except Exception as e:
+                    logger.error(f"Error closing previous connection: {e}")
 
             self._connection = websocket
             state.ws_connected = True
@@ -67,12 +70,16 @@ class WebSocketBridge(ExtensionBridge):
         try:
             async for message in websocket:
                 await self._process_incoming_message(message)
-        except websockets.ConnectionClosed:
-            logger.info("Extension connection closed")
+        except websockets.ConnectionClosed as e:
+            logger.info(f"Extension connection closed: {e}")
+            connected = False
         except Exception as e:
             logger.error(f"Error in connection loop: {e}")
+            connected = False
         finally:
             async with self._connection_lock:
+                if connected:
+                    logger.info("Extension connection closed")
                 self._connection = None
                 state.ws_connected = False
             # Fail any pending requests on disconnect
