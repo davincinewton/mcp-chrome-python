@@ -8,45 +8,11 @@ from pathlib import Path
 import uvicorn
 from api.main import main_app as app, state
 from utils import register_binary
+from logging_config import setup_logging
 
-# Set up log file in user's local data directory
-# Use environment variable with fallback to avoid crashes if $HOME is not set
-def get_log_dir():
-    """Get log directory, with fallback for when running from Chrome."""
-    home = os.environ.get("HOME") or os.environ.get("USERPROFILE") or "/tmp"
-    if home == "/tmp":
-        # Fallback for missing env vars - use a known path
-        try:
-            home = str(Path.home())
-        except Exception:
-            home = "/tmp"
-    return Path(home) / ".local" / "share" / "chrome-mcp"
-
-LOG_DIR = get_log_dir()
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = str(LOG_DIR / "bridge.log")  # Use string path for compatibility
-
-# Custom handler that writes to both file and stdout with explicit flushing
-class DualHandler(logging.Handler):
-    def emit(self, record):
-        msg = self.format(record)
-        # Write to stdout with flush
-        print(msg, flush=True)
-        # Write to file with flush
-        try:
-            with open(LOG_FILE, 'a') as f:
-                f.write(msg + '\n')
-                f.flush()
-        except Exception as e:
-            print(f"Failed to write to log file: {e}", file=sys.stderr, flush=True)
-
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Set up unified logging at module load time
+setup_logging()
 logger = logging.getLogger("mcp-entry")
-logger.handlers.clear()
-logger.addHandler(DualHandler())
-logger.setLevel(logging.DEBUG)
-logger.info(f"Chrome MCP Bridge starting, log file: {LOG_FILE}")
 
 # Note: Task references now stored in state object (state.http_task, state.ws_task)
 

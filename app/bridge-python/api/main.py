@@ -22,7 +22,6 @@ from bridge.websocket_bridge import WebSocketBridge
 from mcp_server_logic import ChromeMcpServer
 from schemas.shared import EXTENSION_REQUEST_TIMEOUT
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mcp-api")
 
 
@@ -169,7 +168,47 @@ app.add_middleware(
 
 @app.get("/ping")
 async def ping():
-    return {"status": "ok", "message": "pong"}
+    """Enhanced health check with connection status and metrics."""
+    import time
+
+    # Calculate uptime
+    uptime_seconds = None
+    if state.uptime_start:
+        uptime_seconds = time.time() - state.uptime_start
+
+    # Calculate time since last activity
+    last_activity_ago = None
+    if state.last_activity:
+        last_activity_ago = time.time() - state.last_activity
+
+    # Determine overall status
+    status = "healthy"
+    if not state.ws_connected and state.uptime_start:
+        # Server running but no extension connection
+        status = "degraded"
+    if state.http_task and state.http_task.done():
+        status = "unhealthy"
+
+    # Get pending requests count
+    pending_requests = 0
+    if hasattr(state.bridge, '_pending_requests'):
+        pending_requests = len(state.bridge._pending_requests)
+
+    return {
+        "status": status,
+        "timestamp": time.time(),
+        "uptime_seconds": round(uptime_seconds, 2) if uptime_seconds else None,
+        "last_activity_ago_seconds": round(last_activity_ago, 2) if last_activity_ago else None,
+        "services": {
+            "http": "running" if state.http_task and not state.http_task.done() else "stopped",
+            "websocket": "connected" if state.ws_connected else "disconnected",
+            "extension": "running" if state.is_running else "stopped"
+        },
+        "metrics": {
+            "pending_requests": pending_requests,
+            "active_sessions": len(state.sessions)
+        }
+    }
 
 
 @app.get("/ask-extension")

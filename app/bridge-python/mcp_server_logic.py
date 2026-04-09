@@ -5,9 +5,9 @@ from mcp.server import Server
 from mcp.types import Tool, TextContent, CallToolResult
 from bridge.base import ExtensionBridge
 from schemas.tool_schemas import TOOL_SCHEMAS
+from schemas.tool_arguments import TOOL_VALIDATORS
+from pydantic import ValidationError
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mcp-server")
 
 class ChromeMcpServer:
@@ -113,6 +113,18 @@ class ChromeMcpServer:
         Handles tool execution by proxying the call to the Chrome extension.
         Returns CallToolResult with proper isError flag preservation.
         """
+        # Validate arguments if a validator exists for this tool
+        validator = TOOL_VALIDATORS.get(name)
+        if validator:
+            try:
+                validated_args = validator(**args)
+                args = validated_args.model_dump(exclude_none=True)
+            except ValidationError as e:
+                return CallToolResult(
+                    content=[TextContent(type="text", text=f"Invalid arguments: {e}")],
+                    isError=True
+                )
+
         try:
             # Handle dynamic flow tools (name starts with flow.)
             if name.startswith("flow."):
