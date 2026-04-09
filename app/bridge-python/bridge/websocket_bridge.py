@@ -48,6 +48,16 @@ class WebSocketBridge(ExtensionBridge):
         from api.main import state
 
         logger.info(f"Extension connected from {websocket.remote_address}")
+
+        # Close any existing connection before accepting a new one
+        if self._connection is not None:
+            logger.info("Closing previous connection before accepting new one")
+            state.ws_connected = False
+            try:
+                await self._connection.close()
+            except Exception:
+                pass
+
         self._connection = websocket
         state.ws_connected = True
         state.last_activity = time.time()
