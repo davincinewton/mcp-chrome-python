@@ -1,10 +1,14 @@
 import asyncio
 import json
+import time
 import uuid
 import logging
 from typing import Any, Dict, Optional, Callable, Awaitable
 import websockets
 from .base import ExtensionBridge
+
+# Import state for activity tracking
+from api.main import state
 
 logger = logging.getLogger("ws-bridge")
 
@@ -41,6 +45,8 @@ class WebSocketBridge(ExtensionBridge):
         """Handles the lifecycle of a single WebSocket connection."""
         print(f"[WS Bridge] Extension connected from {websocket.remote_address}")
         self._connection = websocket
+        state.ws_connected = True
+        state.last_activity = time.time()
 
         try:
             async for message in websocket:
@@ -51,6 +57,7 @@ class WebSocketBridge(ExtensionBridge):
             print(f"[WS Bridge] Error in connection loop: {e}")
         finally:
             self._connection = None
+            state.ws_connected = False
             # Fail any pending requests on disconnect
             for future in self._pending_requests.values():
                 if not future.done():
@@ -61,6 +68,7 @@ class WebSocketBridge(ExtensionBridge):
         """Parses and dispatches incoming JSON messages."""
         try:
             message = json.loads(raw_message)
+            state.last_activity = time.time()
             print(f"[WS Bridge] <<< Received: {json.dumps(message)}")
 
             if not isinstance(message, dict):
@@ -97,6 +105,7 @@ class WebSocketBridge(ExtensionBridge):
 
         try:
             payload = json.dumps(message)
+            state.last_activity = time.time()
             print(f"[WS Bridge] >>> Sent: {payload}")
             await self._connection.send(payload)
         except Exception as e:
@@ -128,6 +137,7 @@ class WebSocketBridge(ExtensionBridge):
     async def cleanup(self) -> None:
         """Gracefully shuts down the WebSocket server."""
         self._running = False
+        state.ws_connected = False
         if self._server:
             self._server.close()
             await self._server.wait_closed()

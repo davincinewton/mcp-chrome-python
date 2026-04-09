@@ -48,10 +48,7 @@ logger.addHandler(DualHandler())
 logger.setLevel(logging.DEBUG)
 logger.info(f"Chrome MCP Bridge starting, log file: {LOG_FILE}")
 
-# Server state - track tasks for graceful shutdown
-http_task: asyncio.Task | None = None
-ws_task: asyncio.Task | None = None
-shutdown_event = asyncio.Event()
+# Note: Task references now stored in state object (state.http_task, state.ws_task)
 
 async def start_http_server(port: int = 12306):
     """Start the FastAPI HTTP server."""
@@ -78,28 +75,28 @@ async def cleanup(timeout: float = 3.0) -> None:
     logger.info("Starting graceful shutdown...")
 
     # Cancel WebSocket bridge task first (stop accepting new connections)
-    if ws_task and not ws_task.done():
+    if state.ws_task and not state.ws_task.done():
         logger.info("Stopping WebSocket bridge...")
-        ws_task.cancel()
+        state.ws_task.cancel()
         try:
-            await asyncio.wait_for(ws_task, timeout=timeout)
+            await asyncio.wait_for(state.ws_task, timeout=timeout)
         except asyncio.CancelledError:
             logger.info("WebSocket bridge cancelled")
         except asyncio.TimeoutError:
             logger.warning("WebSocket bridge shutdown timed out, forcing")
-            ws_task.cancel()
+            state.ws_task.cancel()
 
     # Cancel HTTP server task
-    if http_task and not http_task.done():
+    if state.http_task and not state.http_task.done():
         logger.info("Stopping HTTP server...")
-        http_task.cancel()
+        state.http_task.cancel()
         try:
-            await asyncio.wait_for(http_task, timeout=timeout)
+            await asyncio.wait_for(state.http_task, timeout=timeout)
         except asyncio.CancelledError:
             logger.info("HTTP server cancelled")
         except asyncio.TimeoutError:
             logger.warning("HTTP server shutdown timed out, forcing")
-            http_task.cancel()
+            state.http_task.cancel()
 
     # Cleanup bridge resources
     try:
@@ -108,7 +105,6 @@ async def cleanup(timeout: float = 3.0) -> None:
     except Exception as e:
         logger.error(f"Error during bridge cleanup: {e}")
 
-    shutdown_event.set()
     logger.info("Graceful shutdown complete")
 
 
@@ -154,7 +150,7 @@ async def main():
     The main entry point for the Python Bridge.
     Starts BOTH the WebSocket Bridge and HTTP server.
     """
-    global http_task, ws_task
+    import time
 
     logger.info("=" * 50)
     logger.info("Chrome MCP WebSocket Bridge Starting...")
@@ -163,9 +159,12 @@ async def main():
     # Set up the bridge message handler
     state.bridge.set_message_handler(handle_bridge_message)
 
+    # Record uptime start time
+    state.uptime_start = time.time()
+
     # Start the HTTP server (non-blocking)
     logger.info("Starting HTTP server...")
-    http_task = asyncio.create_task(start_http_server(12306))
+    state.http_task = asyncio.create_task(start_http_server(12306))
 
     # Give HTTP server a moment to bind
     await asyncio.sleep(0.5)
@@ -178,8 +177,8 @@ async def main():
     logger.info("=" * 50)
 
     try:
-        ws_task = asyncio.create_task(state.bridge.start())
-        await ws_task
+        state.ws_task = asyncio.create_task(state.bridge.start())
+        await state.ws_task
     except Exception as e:
         logger.error(f"WebSocket Bridge encountered a fatal error: {e}")
     finally:

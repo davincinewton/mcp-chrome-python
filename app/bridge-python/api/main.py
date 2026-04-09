@@ -5,6 +5,7 @@ Uses streamable-http transport with JSON responses.
 import asyncio
 import json
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -35,7 +36,14 @@ class ServerState:
         # Named sessions for clients that want session persistence
         self.sessions: dict[str, StreamableHTTPServerTransport] = {}
         self.server_tasks: dict[str, asyncio.Task] = {}
-        self.is_running = False
+
+        # Server lifecycle state
+        self.is_running: bool = False  # Extension start/stop status
+        self.http_task: asyncio.Task | None = None  # HTTP server task
+        self.ws_task: asyncio.Task | None = None  # WebSocket server task
+        self.ws_connected: bool = False  # WebSocket connection status
+        self.uptime_start: float | None = None  # Server start timestamp
+        self.last_activity: float | None = None  # Last message timestamp
 
 
 state = ServerState()
