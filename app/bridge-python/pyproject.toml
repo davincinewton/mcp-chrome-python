@@ -64,6 +64,7 @@ packages = ["bridge_python"]
 "main.py" = "bridge_python/main.py"
 "utils.py" = "bridge_python/utils.py"
 "mcp_server_logic.py" = "bridge_python/mcp_server_logic.py"
+"logging_config.py" = "bridge_python/logging_config.py"
 "api/" = "bridge_python/api/"
 "bridge/" = "bridge_python/bridge/"
 "schemas/" = "bridge_python/schemas/"
@@ -74,6 +75,7 @@ include = [
     "/main.py",
     "/utils.py",
     "/mcp_server_logic.py",
+    "/logging_config.py",
     "/api",
     "/bridge",
     "/schemas",

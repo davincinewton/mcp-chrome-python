@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 import uvicorn
 from api.main import main_app as app, state
-from utils import register_binary
 from logging_config import setup_logging
 
 # Set up unified logging at module load time
@@ -119,7 +118,7 @@ async def main():
     import time
 
     logger.info("=" * 50)
-    logger.info("Chrome MCP WebSocket Bridge Starting...")
+    logger.info("MCP Chrome Bridge Starting...")
     logger.info("=" * 50)
 
     # Set up the bridge message handler
@@ -138,7 +137,7 @@ async def main():
     # Start the WebSocket Bridge
     # Since WebSocketBridge.start() is a long-running server loop,
     # we wrap it in a task or just await it as the final blocking call.
-    logger.info("Starting WebSocket Bridge on port 12307...")
+    logger.info("Starting WebSocket Bridge...")
     logger.info("Waiting for Chrome extension to connect via WebSocket...")
     logger.info("=" * 50)
 
@@ -154,15 +153,13 @@ async def main():
 
 def main_cli():
     """Handle CLI arguments and dispatch accordingly."""
-    parser = argparse.ArgumentParser(description="Chrome MCP Native Server")
-    parser.add_argument("--register", action="store_true", help="Register the binary with Chrome and exit")
+    parser = argparse.ArgumentParser(description="MCP Chrome Bridge - Connect Chrome extension to AI assistants")
+    parser.add_argument("--register", action="store_true", help=argparse.SUPPRESS)
 
     args = parser.parse_args()
 
-    if args.register:
-        register_binary()
-    else:
-        asyncio.run(main())
+    # --register is deprecated and no longer needed
+    asyncio.run(main())
 
 
 async def run_with_signal_handling():

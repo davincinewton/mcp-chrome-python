@@ -5,8 +5,8 @@ import json
 import platform
 from pathlib import Path
 
-HOST_NAME = "com.chromemcp.nativehost"
-DESCRIPTION = "Chrome MCP Native Server (Python)"
+HOST_NAME = "com.chromemcp.bridge"
+DESCRIPTION = "MCP Chrome Bridge - Python WebSocket to Native Messaging Bridge"
 EXTENSION_ID = "hbdgbgagpkpjffpklnamcljpakneikee"
 
 def get_manifest_path():
