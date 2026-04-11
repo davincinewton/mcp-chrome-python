@@ -10,7 +10,7 @@
 
 **📖 Documentation**: [English](README.md) | [中文](README_zh.md)
 
-> The project is still in its early stages and is under intensive development. More features, stability improvements, and other enhancements will follow.
+> The project is under active development. Python bridge now available - no Node.js required!
 
 ---
 
@@ -54,46 +54,56 @@ Chrome MCP Server is a Chrome extension-based **Model Context Protocol (MCP) ser
 
 ### Installation Steps
 
-1. **Download the latest Chrome extension from GitHub**
-
-Download link: https://github.com/hangwin/mcp-chrome/releases
-
-2. **Install mcp-chrome-bridge globally**
-
-npm
+1. **Clone the repository**
 
 ```bash
-npm install -g mcp-chrome-bridge
+git clone https://github.com/davincinewton/mcp-chrome-python.git
+cd mcp-chrome-python
 ```
 
-pnpm
+2. **Install the Python bridge**
+
+From the repository root:
 
 ```bash
-# Method 1: Enable scripts globally (recommended)
-pnpm config set enable-pre-post-scripts true
-pnpm install -g mcp-chrome-bridge
-
-# Method 2: Manual registration (if postinstall doesn't run)
-pnpm install -g mcp-chrome-bridge
-mcp-chrome-bridge register
+pip install -e app/bridge-python
 ```
 
-> Note: pnpm v7+ disables postinstall scripts by default for security. The `enable-pre-post-scripts` setting controls whether pre/post install scripts run. If automatic registration fails, use the manual registration command above.
+Or install from source without cloning:
+
+```bash
+pip install "mcp-chrome-bridge @ git+https://github.com/davincinewton/mcp-chrome-python.git#subdirectory=app/bridge-python"
+```
 
 3. **Load Chrome Extension**
    - Open Chrome and go to `chrome://extensions/`
    - Enable "Developer mode"
-   - Click "Load unpacked" and select `your/dowloaded/extension/folder`
+   - Click "Load unpacked" and select the `app/extension` folder from the cloned repository
    - Click the extension icon to open the plugin, then click connect to see the MCP configuration
      <img width="475" alt="Screenshot 2025-06-09 15 52 06" src="https://github.com/user-attachments/assets/241e57b8-c55f-41a4-9188-0367293dc5bc" />
 
+### Uninstall
+
+```bash
+pip uninstall mcp-chrome-bridge
+```
+
 ### Usage with MCP Protocol Clients
 
-#### Using Streamable HTTP Connection (👍🏻 Recommended)
+#### Start the Bridge Server
 
-Add the following configuration to your MCP client configuration (using CherryStudio as an example):
+```bash
+mcp-chrome-bridge
+```
 
-> Streamable HTTP connection method is recommended
+The server starts two services:
+
+- **HTTP/SSE Server** on port `127.0.0.1:12306` - For MCP client connections
+- **WebSocket Server** on port `127.0.0.1:12307` - For Chrome extension communication
+
+#### Configure Your MCP Client
+
+Add the following configuration to your MCP client:
 
 ```json
 {
@@ -106,41 +116,7 @@ Add the following configuration to your MCP client configuration (using CherrySt
 }
 ```
 
-#### Using STDIO Connection (Alternative)
-
-If your client only supports stdio connection method, please use the following approach:
-
-1. First, check the installation location of the npm package you just installed
-
-```sh
-# npm check method
-npm list -g mcp-chrome-bridge
-# pnpm check method
-pnpm list -g mcp-chrome-bridge
-```
-
-Assuming the command above outputs the path: /Users/xxx/Library/pnpm/global/5
-Then your final path would be: /Users/xxx/Library/pnpm/global/5/node_modules/mcp-chrome-bridge/dist/mcp/mcp-server-stdio.js
-
-2. Replace the configuration below with the final path you just obtained
-
-```json
-{
-  "mcpServers": {
-    "chrome-mcp-stdio": {
-      "command": "npx",
-      "args": [
-        "node",
-        "/Users/xxx/Library/pnpm/global/5/node_modules/mcp-chrome-bridge/dist/mcp/mcp-server-stdio.js"
-      ]
-    }
-  }
-}
-```
-
-eg：config in augment:
-
-<img width="494" alt="截屏2025-06-22 22 11 25" src="https://github.com/user-attachments/assets/48eefc0c-a257-4d3b-8bbe-d7ff716de2bf" />
+That's it! The bridge automatically handles communication between your MCP client and the Chrome extension.
 
 ## 🛠️ Available Tools
 
@@ -294,6 +270,36 @@ We have exciting plans for the future development of Chrome MCP Server:
 
 **Want to contribute to any of these features?** Check out our [Contributing Guide](docs/CONTRIBUTING.md) and join our development community!
 
+## 🐍 Python Bridge
+
+The `mcp-chrome-bridge` is a Python-based MCP server that bridges your Chrome extension with AI assistants.
+
+### Features
+
+- Pure Python implementation - No Node.js required
+- Streamable HTTP/SSE support
+- WebSocket bridge for extension communication
+- Automatic reconnection handling
+- Comprehensive logging
+
+### Commands
+
+```bash
+# Start the bridge server
+mcp-chrome-bridge
+
+# View help
+mcp-chrome-bridge --help
+```
+
+### Logs
+
+Logs are output to stdout/stderr. Key log messages include:
+
+- `Extension connected/disconnected` - Extension connection status
+- `Starting MCP HTTP/SSE Server on port 12306` - HTTP server started
+- `Starting WebSocket Bridge on port 12307` - WebSocket server started
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -303,3 +309,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Architecture Design](docs/ARCHITECTURE.md) - Detailed technical architecture documentation
 - [TOOLS API](docs/TOOLS.md) - Complete tool API documentation
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issue solutions
+
+## 🔧 Troubleshooting
+
+### Extension not connecting
+
+- Check that the Python bridge is running: `mcp-chrome-bridge`
+- Verify WebSocket connection on port 12307
+- Check logs for connection events
+
+### Module not found
+
+- Ensure you installed from the correct subdirectory: `pip install -e app/bridge-python`
+- Verify installation: `pip show mcp-chrome-bridge`
