@@ -144,6 +144,9 @@ async def main():
     try:
         state.ws_task = asyncio.create_task(state.bridge.start())
         await state.ws_task
+    except asyncio.CancelledError:
+        # Expected during graceful shutdown - suppress this
+        pass
     except Exception as e:
         logger.error(f"WebSocket Bridge encountered a fatal error: {e}")
     finally:
@@ -186,7 +189,6 @@ async def handle_signal():
 if __name__ == "__main__":
     try:
         asyncio.run(run_with_signal_handling())
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        # Fallback for when signal handling doesn't work
-        # CancelledError is expected during graceful shutdown
+    except KeyboardInterrupt:
+        # Expected during graceful shutdown - suppress this
         pass
