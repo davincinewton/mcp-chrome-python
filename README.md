@@ -75,10 +75,20 @@ Or install from source without cloning:
 pip install "mcp-chrome-bridge @ git+https://github.com/davincinewton/mcp-chrome-python.git#subdirectory=app/bridge-python"
 ```
 
-3. **Load Chrome Extension**
+3. **Build the Chrome Extension**
+
+   From the repository root:
+
+   ```bash
+   pnpm install
+   pnpm run build:shared
+   pnpm run build:extension
+   ```
+
+4. **Load Chrome Extension**
    - Open Chrome and go to `chrome://extensions/`
    - Enable "Developer mode"
-   - Click "Load unpacked" and select the `app/extension` folder from the cloned repository
+   - Click "Load unpacked" and select the `app/chrome-extension` folder from the cloned repository
    - Click the extension icon to open the plugin, then click connect to see the MCP configuration
      <img width="475" alt="Screenshot 2025-06-09 15 52 06" src="https://github.com/user-attachments/assets/241e57b8-c55f-41a4-9188-0367293dc5bc" />
 
