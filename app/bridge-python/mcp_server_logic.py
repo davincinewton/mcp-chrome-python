@@ -2,7 +2,14 @@ import asyncio
 import logging
 from typing import Any, Dict, List
 from mcp.server import Server
-from mcp.types import Tool, TextContent, CallToolResult
+from mcp.types import (
+    Tool,
+    TextContent,
+    CallToolResult,
+    ListToolsResult,
+    PaginatedRequestParams,
+    CallToolRequestParams,
+)
 from bridge.base import ExtensionBridge
 from schemas.tool_schemas import TOOL_SCHEMAS
 from schemas.tool_arguments import TOOL_VALIDATORS
@@ -21,19 +28,34 @@ class ChromeMcpServer:
         self._setup_handlers()
 
     def _setup_handlers(self):
-        """Registers MCP request handlers."""
+        """Registers MCP request handlers.
+
+        The low-level ``mcp.server.Server`` (SDK >= 2.x) no longer exposes the
+        ``list_tools()`` / ``call_tool()`` decorators; handlers are registered
+        per JSON-RPC method via ``add_request_handler``.
+        """
         # List tools handler
-        @self.server.list_tools()
-        async def handle_list_tools() -> List[Tool]:
-            # Combine static tools (placeholder for now) and dynamic tools
-            static_tools = self._get_static_tools()
-            dynamic_tools = await self._list_dynamic_flow_tools()
-            return static_tools + dynamic_tools
+        self.server.add_request_handler(
+            "tools/list",
+            PaginatedRequestParams,
+            self._handle_list_tools_request,
+        )
 
         # Call tool handler
-        @self.server.call_tool()
-        async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
-            return await self._handle_tool_call(name, arguments)
+        self.server.add_request_handler(
+            "tools/call",
+            CallToolRequestParams,
+            self._handle_call_tool_request,
+        )
+
+    async def _handle_list_tools_request(self, ctx, params) -> ListToolsResult:
+        # Combine static tools (placeholder for now) and dynamic tools
+        static_tools = self._get_static_tools()
+        dynamic_tools = await self._list_dynamic_flow_tools()
+        return ListToolsResult(tools=static_tools + dynamic_tools)
+
+    async def _handle_call_tool_request(self, ctx, params) -> CallToolResult:
+        return await self._handle_tool_call(params.name, params.arguments or {})
 
     def _get_static_tools(self) -> List[Tool]:
         """

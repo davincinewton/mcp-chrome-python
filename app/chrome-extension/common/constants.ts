@@ -231,7 +231,11 @@ export const SEMANTIC_CONFIG = {
 // Storage Keys
 export const STORAGE_KEYS = {
   SERVER_STATUS: 'serverStatus',
+  // Legacy HTTP/MCP port key. The UI now exposes the WebSocket port instead;
+  // the HTTP port is reported by the bridge via serverStatus.port.
   NATIVE_SERVER_PORT: 'nativeServerPort',
+  // WebSocket port the extension connects to the Python bridge on (default 12307).
+  WS_PORT: 'wsPort',
   NATIVE_AUTO_CONNECT_ENABLED: 'nativeAutoConnectEnabled',
   SEMANTIC_MODEL: 'selectedModel',
   USER_PREFERENCES: 'userPreferences',

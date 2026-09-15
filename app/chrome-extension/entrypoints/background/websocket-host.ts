@@ -201,33 +201,25 @@ async function setAutoConnectEnabled(enabled: boolean): Promise<void> {
 // ==================== Port Preference ====================
 
 /**
- * Get the preferred port for connecting to bridge server.
- * Priority: explicit override > user preference > last known port > default
+ * Get the preferred WebSocket port for connecting to the bridge server.
+ * Priority: explicit override > user preference (wsPort) > default (12307).
+ *
+ * Note: this is the WebSocket port only. The HTTP/MCP port is reported by the
+ * bridge via serverStatus.port and is resolved separately by the consumers.
  */
 async function getPreferredPort(override?: unknown): Promise<number> {
   const explicit = normalizePort(override);
   if (explicit) return explicit;
 
   try {
-    const result = await chrome.storage.local.get([
-      STORAGE_KEYS.NATIVE_SERVER_PORT,
-      STORAGE_KEYS.SERVER_STATUS,
-    ]);
-
-    const userPort = normalizePort(result[STORAGE_KEYS.NATIVE_SERVER_PORT]);
+    const result = await chrome.storage.local.get([STORAGE_KEYS.WS_PORT]);
+    const userPort = normalizePort(result[STORAGE_KEYS.WS_PORT]);
     if (userPort) return userPort;
-
-    const status = result[STORAGE_KEYS.SERVER_STATUS] as Partial<ServerStatus> | undefined;
-    const statusPort = normalizePort(status?.port);
-    if (statusPort) return statusPort;
   } catch (error) {
-    console.warn(`${LOG_PREFIX} Failed to read preferred port`, error);
+    console.warn(`${LOG_PREFIX} Failed to read preferred WS port`, error);
   }
 
-  const inMemoryPort = normalizePort(currentServerStatus.port);
-  if (inMemoryPort) return inMemoryPort;
-
-  return 12306; // Default MCP HTTP port
+  return WEBSOCKET_CONFIG.PORT; // Default WebSocket port
 }
 
 // ==================== Reconnect Scheduling ====================
@@ -331,9 +323,9 @@ async function ensureConnected(trigger: string, portOverride?: unknown): Promise
 
 /**
  * Connect to the WebSocket server
- * @param port - The HTTP/MCP port to use (default 12306)
+ * @param port - The WebSocket port to connect to (default 12307)
  */
-export function connectWebSocket(port: number = 12306): void {
+export function connectWebSocket(port: number = WEBSOCKET_CONFIG.PORT): void {
   console.log(`[DEBUG connectWebSocket] port = ${port}`);
   console.log(`[DEBUG connectWebSocket] ws = ${ws}`);
 
@@ -349,7 +341,7 @@ export function connectWebSocket(port: number = 12306): void {
       ws = null;
     }
 
-    const wsUrl = `ws://127.0.0.1:${WEBSOCKET_CONFIG.PORT}`;
+    const wsUrl = `ws://127.0.0.1:${port}`;
     console.log(`[DEBUG connectWebSocket] Connecting to ${wsUrl}`);
     ws = new WebSocket(wsUrl);
 
@@ -568,9 +560,9 @@ export const initWebSocketHostListener = () => {
         await setAutoConnectEnabled(true);
 
         if (normalized) {
-          // Best-effort: persist preferred port
+          // Best-effort: persist preferred WS port
           try {
-            await chrome.storage.local.set({ [STORAGE_KEYS.NATIVE_SERVER_PORT]: normalized });
+            await chrome.storage.local.set({ [STORAGE_KEYS.WS_PORT]: normalized });
           } catch {
             // Ignore
           }

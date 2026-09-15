@@ -78,14 +78,14 @@ async def handle_bridge_message(message: dict):
     logger.debug(f"<<< Received message from extension: {message}")
 
     msg_type = message.get("type")
-    payload = message.get("payload", {})
 
     if msg_type == "start":
-        port = payload.get("port", 12306)
-        logger.info(f"Received 'start' command from extension (port: {port})")
+        # The value in payload.port is now the WebSocket port the extension used.
+        # The MCP endpoint lives on the bridge's own HTTP port, so report the
+        # actual bound HTTP port (state.http_port) for a correct client config.
         state.is_running = True
-        # Protocol: must use 'server_started' not 'started'
-        response = {"type": "server_started", "payload": {"port": port}}
+        response = {"type": "server_started", "payload": {"port": state.http_port}}
+        logger.info(f"Received 'start' command from extension; reporting HTTP port {state.http_port}")
         await state.bridge.send_message(response)
         logger.debug(f">>> Sent response to extension: {response}")
 
@@ -110,10 +110,14 @@ async def handle_bridge_message(message: dict):
     else:
         logger.warning(f"Unhandled message type: {msg_type}")
 
-async def main():
+async def main(http_port: int = 12306, ws_port: int = 12307):
     """
     The main entry point for the Python Bridge.
     Starts BOTH the WebSocket Bridge and HTTP server.
+
+    Args:
+        http_port: Port for the HTTP/MCP server (default 12306).
+        ws_port: Port for the WebSocket bridge that the Chrome extension connects to (default 12307).
     """
     import time
 
@@ -127,17 +131,25 @@ async def main():
     # Record uptime start time
     state.uptime_start = time.time()
 
+    # Record the actual HTTP port so the extension can be told where /mcp lives.
+    state.http_port = http_port
+
     # Start the HTTP server (non-blocking)
     logger.info("Starting HTTP server...")
-    state.http_task = asyncio.create_task(start_http_server(12306))
+    state.http_task = asyncio.create_task(start_http_server(http_port))
 
     # Give HTTP server a moment to bind
     await asyncio.sleep(0.5)
 
+    # Apply the configured WebSocket port before starting the bridge.
+    # WebSocketBridge.start() reads self.port at call time, so setting it here
+    # is sufficient without re-instantiating the bridge.
+    state.bridge.port = ws_port
+
     # Start the WebSocket Bridge
     # Since WebSocketBridge.start() is a long-running server loop,
     # we wrap it in a task or just await it as the final blocking call.
-    logger.info("Starting WebSocket Bridge...")
+    logger.info(f"Starting WebSocket Bridge on port {ws_port}...")
     logger.info("Waiting for Chrome extension to connect via WebSocket...")
     logger.info("=" * 50)
 
@@ -154,19 +166,32 @@ async def main():
         await cleanup()
 
 
+def _parse_args(argv=None):
+    """Parse command-line arguments for the bridge."""
+    parser = argparse.ArgumentParser(description="MCP Chrome Bridge - Connect Chrome extension to AI assistants")
+    parser.add_argument(
+        "--http-port", type=int, default=12306,
+        help="Port for the HTTP/MCP server (default 12306)",
+    )
+    parser.add_argument(
+        "--ws-port", type=int, default=12307,
+        help="Port for the WebSocket bridge the Chrome extension connects to (default 12307)",
+    )
+    parser.add_argument("--register", action="store_true", help=argparse.SUPPRESS)
+    return parser.parse_args(argv)
+
+
 def main_cli():
     """Handle CLI arguments and dispatch accordingly."""
-    parser = argparse.ArgumentParser(description="MCP Chrome Bridge - Connect Chrome extension to AI assistants")
-    parser.add_argument("--register", action="store_true", help=argparse.SUPPRESS)
-
-    args = parser.parse_args()
+    args = _parse_args()
 
     # --register is deprecated and no longer needed
-    asyncio.run(main())
+    asyncio.run(main(args.http_port, args.ws_port))
 
 
 async def run_with_signal_handling():
     """Run the main function with proper signal handling for graceful shutdown."""
+    args = _parse_args()
     loop = asyncio.get_running_loop()
 
     # Set up signal handlers for Unix-like systems
@@ -177,7 +202,7 @@ async def run_with_signal_handling():
         # Windows fallback: handle Ctrl+C via exception
         pass
 
-    await main()
+    await main(args.http_port, args.ws_port)
 
 
 async def handle_signal():

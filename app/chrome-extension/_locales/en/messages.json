@@ -90,8 +90,8 @@
     "description": "MCP server configuration section label"
   },
   "connectionPortLabel": {
-    "message": "Connection Port",
-    "description": "Connection port input label"
+    "message": "WebSocket Port",
+    "description": "WebSocket port input label (port the extension connects to the bridge on)"
   },
   "refreshStatusButton": {
     "message": "Refresh Status",

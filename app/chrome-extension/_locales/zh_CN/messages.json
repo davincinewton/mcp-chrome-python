@@ -90,8 +90,8 @@
     "description": "MCP 服务器配置节标签"
   },
   "connectionPortLabel": {
-    "message": "连接端口",
-    "description": "连接端口输入标签"
+    "message": "WebSocket 端口",
+    "description": "WebSocket 端口输入标签（扩展连接桥接服务的端口）"
   },
   "refreshStatusButton": {
     "message": "刷新状态",

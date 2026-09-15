@@ -46,13 +46,7 @@
             </div>
             <div class="port-section">
               <label for="port" class="port-label">{{ getMessage('connectionPortLabel') }}</label>
-              <input
-                type="text"
-                id="port"
-                :value="nativeServerPort"
-                @input="updatePort"
-                class="port-input"
-              />
+              <input type="text" id="port" :value="wsPort" @input="updatePort" class="port-input" />
             </div>
 
             <button class="connect-button" :disabled="isConnecting" @click="testNativeConnection">
@@ -514,7 +508,8 @@ const runFlow = async (flowId: string) => {
 
 const nativeConnectionStatus = ref<'unknown' | 'connected' | 'disconnected'>('unknown');
 const isConnecting = ref(false);
-const nativeServerPort = ref<number>(12306);
+// WebSocket port the extension connects to the Python bridge on (default 12307).
+const wsPort = ref<number>(12307);
 
 const serverStatus = ref<{
   isRunning: boolean;
@@ -532,7 +527,9 @@ const showMcpConfig = computed(() => {
 const copyButtonText = ref(getMessage('copyConfigButton'));
 
 const mcpConfigJson = computed(() => {
-  const port = serverStatus.value.port || nativeServerPort.value;
+  // The HTTP/MCP port is reported by the bridge via serverStatus.port; fall
+  // back to the default HTTP port (12306) before the first server_started.
+  const port = serverStatus.value.port || 12306;
   const config = {
     mcpServers: {
       'streamable-mcp-server': {
@@ -986,7 +983,7 @@ const retryModelInitialization = async () => {
 const updatePort = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const newPort = Number(target.value);
-  nativeServerPort.value = newPort;
+  wsPort.value = newPort;
 
   await savePortPreference(newPort);
 };
@@ -1065,16 +1062,16 @@ const testNativeConnection = async () => {
       await chrome.runtime.sendMessage({ type: 'disconnect_native' });
       nativeConnectionStatus.value = 'disconnected';
     } else {
-      console.log(`尝试连接到端口: ${nativeServerPort.value}`);
+      console.log(`尝试连接到端口: ${wsPort.value}`);
       // eslint-disable-next-line no-undef
       const response = await chrome.runtime.sendMessage({
         type: 'connectNative',
-        port: nativeServerPort.value,
+        port: wsPort.value,
       });
       if (response && response.success) {
         nativeConnectionStatus.value = 'connected';
         console.log('连接成功:', response);
-        await savePortPreference(nativeServerPort.value);
+        await savePortPreference(wsPort.value);
       } else {
         nativeConnectionStatus.value = 'disconnected';
         console.error('连接失败:', response);
@@ -1183,7 +1180,7 @@ const saveVersionPreference = async (version: 'full' | 'quantized' | 'compressed
 const savePortPreference = async (port: number) => {
   try {
     // eslint-disable-next-line no-undef
-    await chrome.storage.local.set({ nativeServerPort: port });
+    await chrome.storage.local.set({ wsPort: port });
     console.log(`端口偏好已保存: ${port}`);
   } catch (error) {
     console.error('保存端口偏好失败:', error);
@@ -1193,10 +1190,10 @@ const savePortPreference = async (port: number) => {
 const loadPortPreference = async () => {
   try {
     // eslint-disable-next-line no-undef
-    const result = await chrome.storage.local.get(['nativeServerPort']);
-    if (result.nativeServerPort) {
-      nativeServerPort.value = result.nativeServerPort;
-      console.log(`端口偏好已加载: ${result.nativeServerPort}`);
+    const result = await chrome.storage.local.get(['wsPort']);
+    if (result.wsPort) {
+      wsPort.value = result.wsPort;
+      console.log(`端口偏好已加载: ${result.wsPort}`);
     }
   } catch (error) {
     console.error('加载端口偏好失败:', error);

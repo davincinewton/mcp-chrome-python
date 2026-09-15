@@ -1006,12 +1006,12 @@ export function initWebEditorListeners(): void {
               return sendResponse({ success: false, error: 'debugSource.file is required' });
             }
 
-            // Read server port and selected project
+            // Read the HTTP/MCP port (reported by the bridge via serverStatus) and selected project
             const stored = await chrome.storage.local.get([
-              'nativeServerPort',
+              'serverStatus',
               'agent-selected-project-id',
             ]);
-            const portRaw = stored.nativeServerPort;
+            const portRaw = (stored.serverStatus as { port?: number } | undefined)?.port;
             const port = Number.isFinite(Number(portRaw))
               ? Number(portRaw)
               : DEFAULT_NATIVE_SERVER_PORT;
@@ -1225,13 +1225,13 @@ export function initWebEditorListeners(): void {
           const senderTabId = (_sender as chrome.runtime.MessageSender)?.tab?.id;
           const senderWindowId = (_sender as chrome.runtime.MessageSender)?.tab?.windowId;
 
-          // Read storage for server port and selected session
+          // Read storage for the HTTP/MCP port (reported by the bridge) and selected session
           const stored = await chrome.storage.local.get([
-            'nativeServerPort',
+            'serverStatus',
             STORAGE_KEY_SELECTED_SESSION,
           ]);
 
-          const portRaw = stored?.nativeServerPort;
+          const portRaw = (stored?.serverStatus as { port?: number } | undefined)?.port;
           const port = Number.isFinite(Number(portRaw))
             ? Number(portRaw)
             : DEFAULT_NATIVE_SERVER_PORT;
@@ -1485,10 +1485,10 @@ export function initWebEditorListeners(): void {
             typeof senderTabId === 'number' ? `web-editor-${senderTabId}` : 'web-editor';
 
           const stored = await chrome.storage.local.get([
-            'nativeServerPort',
+            'serverStatus',
             'agent-selected-project-id',
           ]);
-          const portRaw = stored?.nativeServerPort;
+          const portRaw = (stored?.serverStatus as { port?: number } | undefined)?.port;
           const port = Number.isFinite(Number(portRaw))
             ? Number(portRaw)
             : DEFAULT_NATIVE_SERVER_PORT;
@@ -1587,9 +1587,11 @@ export function initWebEditorListeners(): void {
             return;
           }
 
-          // Get server port
-          const stored = await chrome.storage.local.get(['nativeServerPort']);
-          const port = stored.nativeServerPort || DEFAULT_NATIVE_SERVER_PORT;
+          // Get the HTTP/MCP port (reported by the bridge)
+          const stored = await chrome.storage.local.get(['serverStatus']);
+          const port =
+            (stored.serverStatus as { port?: number } | undefined)?.port ||
+            DEFAULT_NATIVE_SERVER_PORT;
 
           try {
             // Call cancel API

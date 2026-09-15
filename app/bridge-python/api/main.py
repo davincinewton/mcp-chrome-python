@@ -38,6 +38,7 @@ class ServerState:
 
         # Server lifecycle state
         self.is_running: bool = False  # Extension start/stop status
+        self.http_port: int = 12306  # Actual HTTP/MCP port the server binds to (reported to the extension)
         self.http_task: asyncio.Task | None = None  # HTTP server task
         self.ws_task: asyncio.Task | None = None  # WebSocket server task
         self.ws_connected: bool = False  # WebSocket connection status

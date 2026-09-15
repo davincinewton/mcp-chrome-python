@@ -591,13 +591,14 @@ async function handleSendToAI(
     return { success: false, error: 'instruction is required' };
   }
 
-  // Read server port and selected session from storage
+  // Read the HTTP/MCP port (reported by the bridge via serverStatus) and the selected session
   const stored = await chrome.storage.local.get([
-    STORAGE_KEYS.NATIVE_SERVER_PORT,
+    STORAGE_KEYS.SERVER_STATUS,
     STORAGE_KEY_SELECTED_SESSION,
   ]);
 
-  const port = normalizePort(stored?.[STORAGE_KEYS.NATIVE_SERVER_PORT]) ?? NATIVE_HOST.DEFAULT_PORT;
+  const serverStatus = stored?.[STORAGE_KEYS.SERVER_STATUS] as { port?: number } | undefined;
+  const port = normalizePort(serverStatus?.port) ?? NATIVE_HOST.DEFAULT_PORT;
   const sessionId = normalizeString(stored?.[STORAGE_KEY_SELECTED_SESSION]).trim();
 
   if (!sessionId) {
@@ -694,11 +695,12 @@ async function handleCancelAI(
     }
   }
 
-  // Determine port
+  // Determine port (HTTP/MCP port reported by the bridge)
   let port = activeRequest?.port;
   if (!port) {
-    const stored = await chrome.storage.local.get([STORAGE_KEYS.NATIVE_SERVER_PORT]);
-    port = normalizePort(stored?.[STORAGE_KEYS.NATIVE_SERVER_PORT]) ?? NATIVE_HOST.DEFAULT_PORT;
+    const stored = await chrome.storage.local.get([STORAGE_KEYS.SERVER_STATUS]);
+    const serverStatus = stored?.[STORAGE_KEYS.SERVER_STATUS] as { port?: number } | undefined;
+    port = normalizePort(serverStatus?.port) ?? NATIVE_HOST.DEFAULT_PORT;
   }
 
   // Cancel on server (async, don't await)
